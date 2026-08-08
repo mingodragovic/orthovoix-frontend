@@ -1,7 +1,6 @@
 // src/hooks/useAuth.ts
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/providers/AuthProvider';
 import { tokenManager } from '@/utils/tokenManager';
 import { useToast } from './useToast';
 import { useTranslation } from './useTranslation';
@@ -9,6 +8,8 @@ import {
   login,
   register,
   logout,
+  refreshTokens,
+  getCurrentUser,
   forgotPassword,
   verifyOTP,
   resetPassword,
@@ -20,9 +21,12 @@ import type {
   VerifyOTPRequest,
   ResetPasswordRequest,
 } from '@/types/auth.types';
+import { useAuth } from '@/providers/AuthProvider';
 import { toast } from 'sonner';
+
 export const authKeys = {
-  user: ['auth', 'user'] as const,
+  user: ['user'] as const,
+  session: ['session'] as const,
 };
 
 // === LOGIN ===
@@ -38,17 +42,18 @@ export function useLogin() {
     onSuccess: (response) => {
       const { user, accessToken, refreshToken } = response.data!;
 
-      // Store tokens
+      // ✅ Store tokens
       tokenManager.setAccessToken(accessToken);
       tokenManager.setRefreshToken(refreshToken);
       tokenManager.setUser(user);
 
-      // Invalidate and refetch
-      queryClient.invalidateQueries({ queryKey: authKeys.user });
+      // ✅ Update query cache
+      queryClient.setQueryData(authKeys.user, user);
       refetch();
 
       success(t('auth.login.success', { name: user.name }));
 
+      // ✅ Use navigate() — NOT window.location.href
       const role = user.role;
       if (role === 'orthophoniste') {
         navigate('/ortho-dashboard');
@@ -62,7 +67,6 @@ export function useLogin() {
     },
   });
 }
-
 // === LOGOUT ===
 export function useLogout() {
   const navigate = useNavigate();
@@ -183,5 +187,29 @@ export function useResetPassword() {
       }
       error(message);
     },
+  });
+}
+
+export function useCurrentUser() {
+  const { error } = useToast();
+  const { t } = useTranslation();
+
+  return useQuery({
+    queryKey: authKeys.user,
+    queryFn: async () => {
+      try {
+        const user = await getCurrentUser();
+        tokenManager.setUser(user);
+        return user;
+      } catch (err: any) {
+        tokenManager.clearAll();
+        error(t('auth.session.expired'));
+        throw err;
+      }
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    retry: false,
+    enabled: tokenManager.hasValidSession(),
   });
 }

@@ -24,11 +24,9 @@ export function I18nProvider({ children }: I18nProviderProps) {
 
   // Force re-render when language changes
   useEffect(() => {
-    console.log('🔄 I18nProvider: language changed to', language);
     setKey(`${language}-${Date.now()}`);
   }, [language]);
 
-  console.log('🔄 I18nProvider rendering with language:', language, 'key:', key);
 
   return (
     <IntlProvider

@@ -2,6 +2,7 @@
 import { useState, useMemo, ReactNode } from 'react';
 import { Search, Filter, ChevronLeft, ChevronRight, ArrowUp, ArrowDown } from 'lucide-react';
 import { useTranslation } from '@/hooks/useTranslation';
+import { Pagination } from './Pagination';
 
 export interface Column<T> {
   key: string;
@@ -321,11 +322,15 @@ export function DataTable<T extends Record<string, any>>({
         </div>
 
         {/* Pagination */}
-        {pagination && pagination.totalPages > 1 && (
-          <div className="mt-6 pt-4 border-t border-gray-100">
-            {renderPagination()}
-          </div>
-        )}
+      {pagination && pagination.totalPages > 1 && (
+  <Pagination
+    currentPage={pagination.currentPage}
+    totalPages={pagination.totalPages}
+    totalItems={pagination.total}
+    itemsPerPage={10} // or use a prop
+    onPageChange={pagination.onPageChange}
+  />
+)}
       </div>
     </div>
   );

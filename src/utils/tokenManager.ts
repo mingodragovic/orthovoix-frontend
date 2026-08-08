@@ -17,14 +17,12 @@ const initFromStorage = () => {
   const storedToken = sessionStorage.getItem(ACCESS_TOKEN_KEY);
   if (storedToken) {
     accessToken = storedToken;
-    console.log('🔑 TokenManager: Access token restored from sessionStorage');
   }
 
   // Refresh token
   const storedRefresh = sessionStorage.getItem(REFRESH_TOKEN_KEY);
   if (storedRefresh) {
     refreshToken = storedRefresh;
-    console.log('🔑 TokenManager: Refresh token restored from sessionStorage');
   }
 
   // User
@@ -32,7 +30,6 @@ const initFromStorage = () => {
   if (storedUser) {
     try {
       currentUser = JSON.parse(storedUser);
-      console.log('👤 TokenManager: User restored from sessionStorage:', currentUser?.email);
     } catch {
       console.error('❌ TokenManager: Failed to parse stored user');
       sessionStorage.removeItem(USER_KEY);
@@ -59,7 +56,6 @@ export const tokenManager = {
   setAccessToken: (token: string): void => {
     accessToken = token;
     sessionStorage.setItem(ACCESS_TOKEN_KEY, token);
-    console.log('🔑 TokenManager: Access token stored');
   },
 
   // Refresh Token
@@ -77,7 +73,6 @@ export const tokenManager = {
   setRefreshToken: (token: string): void => {
     refreshToken = token;
     sessionStorage.setItem(REFRESH_TOKEN_KEY, token);
-    console.log('🔑 TokenManager: Refresh token stored');
   },
 
   // User
@@ -99,7 +94,6 @@ export const tokenManager = {
   setUser: (user: UserProfile): void => {
     currentUser = user;
     sessionStorage.setItem(USER_KEY, JSON.stringify(user));
-    console.log('👤 TokenManager: User stored:', user.email);
   },
 
   // Clear methods
@@ -108,13 +102,11 @@ export const tokenManager = {
     refreshToken = null;
     sessionStorage.removeItem(ACCESS_TOKEN_KEY);
     sessionStorage.removeItem(REFRESH_TOKEN_KEY);
-    console.log('🗑️ TokenManager: Tokens cleared');
   },
 
   clearUser: (): void => {
     currentUser = null;
     sessionStorage.removeItem(USER_KEY);
-    console.log('🗑️ TokenManager: User cleared');
   },
 
   clearAll: (): void => {
@@ -124,7 +116,6 @@ export const tokenManager = {
     sessionStorage.removeItem(ACCESS_TOKEN_KEY);
     sessionStorage.removeItem(REFRESH_TOKEN_KEY);
     sessionStorage.removeItem(USER_KEY);
-    console.log('🗑️ TokenManager: All auth data cleared');
   },
 
   // Auth checks

@@ -11,12 +11,12 @@ export interface Profile {
   lastLogin: string | null;
   createdAt: string;
   updatedAt: string;
-  // Orthophoniste specific
-  specialization?: string | null;
-  licenseNumber?: string | null;
   // Parent specific
   childName?: string | null;
   childId?: string | null;
+  // Orthophoniste specific
+  specialization?: string | null;
+  licenseNumber?: string | null;
 }
 
 export interface UpdateProfileRequest {

@@ -1,32 +1,35 @@
 // src/app/components/common/BottomNav.tsx
-import { Home, Users, BookOpen, BarChart2, User, LogOut } from 'lucide-react';
+import { Home, Users, BookOpen, BarChart2, User, LogOut, Calendar, Bell } from 'lucide-react';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useLanguage } from '@/hooks/useLanguage';
-import { Role, Screen } from '@/types';
+import { useLocation } from 'react-router-dom';
+import { Role } from '@/types/api.types';
 
 interface BottomNavProps {
   role: Role;
   active: string;
-  onNavigate: (s: Screen) => void;
+  onNavigate: (path: string) => void;
   onLogout: () => void;
 }
 
 export function BottomNav({ role, active, onNavigate, onLogout }: BottomNavProps) {
   const { t, isRTL } = useTranslation();
   const { direction } = useLanguage();
+  const location = useLocation();
 
   const orthoItems = [
-    { icon: Home, label: t('sidebar.home'), screen: 'ortho-dashboard' as Screen },
-    { icon: Users, label: t('sidebar.patients'), screen: 'patients' as Screen },
-    { icon: BookOpen, label: t('sidebar.exercises'), screen: 'exercise-create' as Screen },
-    { icon: BarChart2, label: t('sidebar.reports'), screen: 'ortho-progress' as Screen },
+    { icon: Home, label: t('sidebar.home'), path: '/ortho-dashboard' },
+    { icon: Users, label: t('sidebar.patients'), path: '/patients' },
+    { icon: BookOpen, label: t('sidebar.exercises'), path: '/exercises' },
+    { icon: BarChart2, label: t('sidebar.reports'), path: '/ortho-progress' },
   ];
 
   const parentItems = [
-    { icon: Home, label: t('sidebar.home'), screen: 'parent-dashboard' as Screen },
-    { icon: BookOpen, label: t('sidebar.exercises'), screen: 'parent-dashboard' as Screen },
-    { icon: BarChart2, label: t('sidebar.reports'), screen: 'parent-progress' as Screen },
-    { icon: User, label: t('sidebar.settings'), screen: 'parent-dashboard' as Screen },
+    { icon: Home, label: t('bottomNav.home', 'Home'), path: '/parent' },
+    { icon: BookOpen, label: t('bottomNav.exercises', 'Exercises'), path: '/parent/exercises' },
+    { icon: Calendar, label: t('bottomNav.appointments', 'Appointments'), path: '/parent/appointments' },
+    { icon: Bell, label: t('bottomNav.notifications', 'Notifications'), path: '/parent/notifications' },
+    { icon: User, label: t('bottomNav.profile', 'Profile'), path: '/parent/profile' },
   ];
 
   const items = role === 'orthophoniste' ? orthoItems : parentItems;
@@ -38,11 +41,11 @@ export function BottomNav({ role, active, onNavigate, onLogout }: BottomNavProps
       dir={isRTL ? 'rtl' : 'ltr'}
     >
       {items.map((item) => {
-        const isActive = active === item.screen;
+        const isActive = active === item.path || location.pathname.startsWith(item.path);
         return (
           <button
             key={item.label}
-            onClick={() => onNavigate(item.screen)}
+            onClick={() => onNavigate(item.path)}
             className="flex flex-col items-center gap-0.5 px-2 py-1 transition-all relative"
             style={{ color: isActive ? '#4A90D9' : '#718096' }}
           >

@@ -20,10 +20,6 @@ apiClient.interceptors.request.use(
     if (accessToken) {
       config.headers.Authorization = `Bearer ${accessToken}`;
     }
-
-    const language = localStorage.getItem('orthovoix_language') || 'fr';
-    config.headers['Accept-Language'] = language;
-
     return config;
   },
   (error) => Promise.reject(error)
@@ -65,3 +61,22 @@ apiClient.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+// ✅ Auto-refresh token every 10 minutes
+setInterval(async () => {
+  const refreshToken = tokenManager.getRefreshToken();
+  if (!refreshToken) return;
+
+  try {
+    const response = await axios.post(
+      `${API_URL}/auth/refresh`,
+      { refreshToken },
+      { withCredentials: true }
+    );
+    const { accessToken, refreshToken: newRefreshToken } = response.data.data;
+    tokenManager.setAccessToken(accessToken);
+    tokenManager.setRefreshToken(newRefreshToken);
+  } catch (error) {
+    // Silent fail – will redirect on 401
+  }
+}, 10 * 60 * 1000); // 10 minutes

@@ -8,6 +8,9 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
+  FileText,
+  FileAudio,
+  Calendar
 } from 'lucide-react';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -49,12 +52,11 @@ export function Sidebar({
       label: t('sidebar.patients'),
       path: '/patients',
     },
-    {
-      icon: BookOpen,
-      label: t('sidebar.exercises'),
-      path: '/exercise-create',
-    },
-    {
+  {
+  icon: BookOpen,
+  label: t('sidebar.exercises', {}),
+  path: '/exercises', 
+},{
       icon: BarChart2,
       label: t('sidebar.reports'),
       path: '/ortho-progress',
@@ -64,11 +66,26 @@ export function Sidebar({
   label: t('sidebar.users', {}) || 'Users', // Use empty object for interpolation
   path: '/users',
 },
+{
+  icon: FileText, // or any icon you prefer
+  label: t('sidebar.assignments', 'Assignments'),
+  path: '/patient-exercises',
+},
      {
     icon: Settings,
     label: t('sidebar.settings', {}),
     path: '/settings',
   },
+  {
+  icon: Calendar,
+  label: t('sidebar.appointments'),
+  path: '/appointments',
+},
+{
+   icon: FileAudio,
+  label: t('sidebar.recordings'), 
+  path: '/recordings',
+},
  
   ];
 

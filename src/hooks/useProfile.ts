@@ -7,7 +7,7 @@ import {
   getProfile,
   updateProfile,
   changePassword,
-  uploadAvatar,
+  uploadAvatarFile,
   removeAvatar,
   validateAvatarFile,
 } from '@/lib/api/profile';
@@ -25,8 +25,8 @@ export function useProfile() {
   return useQuery({
     queryKey: profileKeys.detail(),
     queryFn: getProfile,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
     enabled: tokenManager.hasValidSession(),
   });
 }
@@ -75,78 +75,44 @@ export function useUploadAvatar() {
 
   return useMutation({
     mutationFn: async ({ file, userId }: { file: File; userId: string }) => {
-      console.log('📤 Starting avatar upload with file:', {
-        name: file.name,
-        type: file.type,
-        size: file.size,
-        userId: userId
-      });
-      
-      // Validate file first
-      validateAvatarFile(file);
-      
       // Step 1: Upload file to storage
-      console.log('📤 Uploading file to storage...');
-      const uploadResult = await uploadAvatar(file, userId);
-      console.log('✅ File uploaded:', uploadResult);
-      
-      // ✅ FIX: UploadAvatarResponse is already the data object, not wrapped
+      const uploadResult = await uploadAvatarFile(file, userId);
       const avatarUrl = uploadResult.url;
-      console.log('📤 Updating profile with avatar URL:', avatarUrl);
-      
-      // Get current profile data
-      const currentProfile = queryClient.getQueryData<any>(profileKeys.detail());
-      
-      // Update profile with the new avatar URL
-      const updateData: UpdateProfileRequest = {
-        avatar: avatarUrl,
-      };
-      
-      // If we have current profile data, preserve other fields
-      if (currentProfile) {
-        updateData.name = currentProfile.name;
-        updateData.email = currentProfile.email;
-        if (currentProfile.role === 'orthophoniste') {
-          updateData.specialization = currentProfile.specialization;
-          updateData.licenseNumber = currentProfile.licenseNumber;
-        } else if (currentProfile.role === 'parent') {
-          updateData.childName = currentProfile.childName;
-        }
+
+      // Step 2: Get current profile from cache OR fetch it if not available
+      let currentProfile = queryClient.getQueryData<Profile>(profileKeys.detail());
+
+      // ✅ FIX: If cache is empty, fetch fresh profile
+      if (!currentProfile) {
+        currentProfile = await getProfile();
       }
-      
-      // Update profile
-      console.log('📤 Updating profile...');
-      const updatedProfile = await updateProfile(updateData);
-      console.log('✅ Profile updated:', updatedProfile);
-      
-      return {
-        uploadResult,
-        updatedProfile,
+
+      // Step 3: Build full update payload with ALL fields
+      const updateData: UpdateProfileRequest = {
+        name: currentProfile.name,
+        email: currentProfile.email,
+        avatar: avatarUrl,
+        childName: currentProfile.childName || null,
+        specialization: currentProfile.specialization || null,
+        licenseNumber: currentProfile.licenseNumber || null,
       };
+
+      // Step 4: Update profile with full payload
+      return await updateProfile(updateData);
     },
     onMutate: () => {
       return loading(t('profile.avatar.uploading', 'Uploading avatar...'));
     },
-    onSuccess: (result) => {
+    onSuccess: (data) => {
       toast.dismiss();
-      
-      // Update cache with the updated profile
-      queryClient.setQueryData(profileKeys.detail(), result.updatedProfile);
+      queryClient.setQueryData(profileKeys.detail(), data);
       queryClient.invalidateQueries({ queryKey: profileKeys.detail() });
-      
       success(t('profile.avatar.success', 'Avatar uploaded successfully'));
     },
     onError: (err: any) => {
       toast.dismiss();
-      console.error('❌ Avatar upload error:', err);
-      
-      // Handle validation errors
-      if (err.message) {
-        error(err.message);
-      } else {
-        const message = err.response?.data?.message || t('profile.avatar.error', 'Failed to upload avatar');
-        error(message);
-      }
+      const message = err.response?.data?.message || t('profile.avatar.error', 'Failed to upload avatar');
+      error(message);
     },
   });
 }

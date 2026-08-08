@@ -1,27 +1,31 @@
 // src/app/pages/LoginScreen.tsx
 import { useState } from 'react';
-import {  Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Globe, ChevronDown, Lock, Mail, AlertCircle } from 'lucide-react';
+import { Globe, ChevronDown, User, Lock, Mail, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useLogin } from '@/hooks/useAuth';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useLanguage } from '@/hooks/useLanguage';
-import { useValidationSchemas, LoginFormValues } from '@/utils/validators';
+import { loginSchema, LoginFormValues } from '@/utils/validators';
 import { Role } from '@/types/api.types';
-import { Logo } from '../components/ui/Logo';
 
-export function LoginScreen() {
+interface LoginScreenProps {
+  onLogin?: (email: string, password: string, role: Role) => void;
+}
+
+export function LoginScreen({ onLogin }: LoginScreenProps) {
+  const navigate = useNavigate();
   const [role, setRole] = useState<Role>('orthophoniste');
   const [lang, setLang] = useState(() => {
     const savedLang = localStorage.getItem('orthovoix_language') || 'fr';
     return savedLang.toUpperCase();
   });
   const [showLang, setShowLang] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const { t } = useTranslation();
   const { setLanguage } = useLanguage();
   const loginMutation = useLogin();
-  const schemas = useValidationSchemas(t);
 
   const {
     register,
@@ -29,7 +33,7 @@ export function LoginScreen() {
     formState: { errors, isSubmitting, isValid },
     setValue,
   } = useForm<LoginFormValues>({
-    resolver: zodResolver(schemas.loginSchema),
+    resolver: zodResolver(loginSchema),
     mode: 'onChange',
     defaultValues: {
       email: '',
@@ -56,8 +60,8 @@ export function LoginScreen() {
     setShowLang(false);
   };
 
-  const onSubmit = (data: LoginFormValues) => {
-    loginMutation.mutate({
+  const onSubmit = async (data: LoginFormValues) => {
+    await loginMutation.mutateAsync({
       email: data.email,
       password: data.password,
     });
@@ -73,8 +77,34 @@ export function LoginScreen() {
     >
       <div className="w-full max-w-md lg:max-w-lg">
         {/* Logo */}
-      <Logo size="lg" />
-
+        <div className="flex flex-col items-center mb-8 md:mb-10">
+          <div
+            className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-white flex items-center justify-center shadow-lg mb-4 relative"
+            style={{ boxShadow: '0 8px 32px rgba(74,144,217,0.3)' }}
+          >
+            <span
+              className="text-3xl md:text-4xl font-bold"
+              style={{ color: '#4A90D9', fontFamily: 'Poppins, sans-serif' }}
+            >
+              O
+            </span>
+            <div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-[#F5A623] flex items-center justify-center text-white text-sm">
+              💬
+            </div>
+          </div>
+          <h1
+            className="text-white text-2xl md:text-3xl font-bold"
+            style={{
+              fontFamily: 'Poppins, sans-serif',
+              textShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            }}
+          >
+            {t('app.title')}
+          </h1>
+          <p className="text-white/80 text-sm md:text-base mt-1">
+            {t('app.subtitle')}
+          </p>
+        </div>
 
         {/* Card */}
         <div className="bg-white rounded-3xl p-6 md:p-8 shadow-2xl">
@@ -129,7 +159,7 @@ export function LoginScreen() {
           </div>
 
           <form onSubmit={handleSubmit(onSubmit)}>
-            {/* Fields */}
+            {/* Email Field */}
             <div className="space-y-4 mb-6">
               <div>
                 <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
@@ -159,6 +189,7 @@ export function LoginScreen() {
                 )}
               </div>
 
+              {/* Password Field with Eye Toggle */}
               <div>
                 <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
                   {t('auth.login.password')} <span className="text-red-500">*</span>
@@ -169,16 +200,23 @@ export function LoginScreen() {
                     className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
                   />
                   <input
-                    type="password"
+                    type={showPassword ? 'text' : 'password'}
                     {...register('password')}
                     placeholder="••••••••"
-                    className={`w-full bg-muted rounded-xl pl-10 pr-4 py-3 md:py-3.5 text-sm outline-none transition-all ${
+                    className={`w-full bg-muted rounded-xl pl-10 pr-10 py-3 md:py-3.5 text-sm outline-none transition-all ${
                       errors.password ? 'border-2 border-red-400 focus:ring-red-400/30' : 'focus:ring-2 focus:ring-primary/30'
                     }`}
                     disabled={loginMutation.isPending}
                     aria-invalid={!!errors.password}
                     aria-describedby={errors.password ? 'password-error' : undefined}
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
                 </div>
                 {errors.password && (
                   <p id="password-error" className="text-xs text-red-500 mt-1 flex items-center gap-1">
@@ -188,31 +226,33 @@ export function LoginScreen() {
               </div>
             </div>
 
+            {/* Links */}
             <div className="flex justify-between items-center mb-6">
-              <Link 
-                to="/register" 
+              <Link
+                to="/register"
                 className="text-xs text-primary font-medium hover:underline"
               >
                 {t('auth.register.title')}
               </Link>
-              <Link 
-                to="/forgot-password" 
+              <Link
+                to="/forgot-password"
                 className="text-xs text-primary font-medium hover:underline"
               >
                 {t('auth.login.forgot')}
               </Link>
             </div>
 
+            {/* Submit Button */}
             <button
               type="submit"
               disabled={!isValid || isSubmitting || loginMutation.isPending}
               className="w-full py-3.5 md:py-4 rounded-2xl text-white font-semibold text-sm md:text-base transition-all duration-150 active:scale-95 hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               style={{
-                background: !isValid || loginMutation.isPending 
-                  ? '#CBD5E0' 
+                background: !isValid || loginMutation.isPending
+                  ? '#CBD5E0'
                   : 'linear-gradient(135deg, #4A90D9, #6EC6A0)',
-                boxShadow: !isValid || loginMutation.isPending 
-                  ? 'none' 
+                boxShadow: !isValid || loginMutation.isPending
+                  ? 'none'
                   : '0 4px 16px rgba(74,144,217,0.4)',
                 fontFamily: 'Poppins, sans-serif',
               }}

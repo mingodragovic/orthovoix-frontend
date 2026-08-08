@@ -21,6 +21,7 @@ export function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
 
+
   const showToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(null), 3000);
@@ -31,58 +32,56 @@ export function AppLayout() {
   };
 
   const isParent = user?.role === 'parent';
-  
-  // ✅ CORRECT: Hide sidebar on mobile, only show for orthophoniste on desktop
   const showSidebar = !isMobile && !isParent && isAuthenticated;
+  
+  // ✅ Only show BottomNav on mobile devices
   const showBottomNav = isMobile && isAuthenticated;
-
-  // Calculate sidebar width for margin (only on desktop)
-  const sidebarWidth = showSidebar 
-    ? (sidebarOpen ? '240px' : '72px') 
-    : '0px';
 
   return (
     <div className="min-h-screen bg-background" dir={isRTL ? 'rtl' : 'ltr'}>
       {toast && <Toast message={toast} onClose={() => setToast(null)} />}
 
-      <div className="flex min-h-screen relative">
-        {/* Sidebar - only for orthophoniste on DESKTOP */}
-        {showSidebar && (
-          <Sidebar
-            active={location.pathname}
-            onNavigate={(path: string) => navigate(path)}
-            isOpen={sidebarOpen}
-            onToggle={() => setSidebarOpen(!sidebarOpen)}
-            user={user || null}
-            onLogout={handleLogout}
-          />
-        )}
+      <div className="flex flex-col min-h-screen relative">
+        <div className="flex flex-1">
+          {/* Sidebar - only for orthophoniste on desktop */}
+          {showSidebar && (
+            <Sidebar
+              active={location.pathname}
+              onNavigate={(path: string) => navigate(path)}
+              isOpen={sidebarOpen}
+              onToggle={() => setSidebarOpen(!sidebarOpen)}
+              user={user || null}
+              onLogout={handleLogout}
+            />
+          )}
 
-        {/* Main Content */}
-        <main
-          className={`
-            flex-1 min-h-screen transition-all duration-300
-            ${isMobile ? 'pb-20' : 'pb-6'}
-          `}
-          style={{
-            // Only apply margin on desktop when sidebar is shown
-            marginLeft: isRTL ? '0' : (showSidebar ? sidebarWidth : '0'),
-            marginRight: isRTL ? (showSidebar ? sidebarWidth : '0') : '0',
-          }}
-        >
-          <div className="container mx-auto px-4 py-4 md:px-6 md:py-6 lg:px-8 lg:py-8 max-w-7xl">
-            <Outlet context={{ showToast }} />
-          </div>
-        </main>
+          {/* Main Content */}
+          <main
+            className={`
+              flex-1 transition-all duration-300
+              ${isMobile ? '' : 'pb-6'}
+            `}
+            style={{
+              marginLeft: isRTL ? '0' : (showSidebar ? (sidebarOpen ? '240px' : '72px') : '0'),
+              marginRight: isRTL ? (showSidebar ? (sidebarOpen ? '240px' : '72px') : '0') : '0',
+            }}
+          >
+            <div className={`container mx-auto px-4 py-4 md:px-6 md:py-6 lg:px-8 lg:py-8 max-w-7xl ${isMobile ? 'pb-20' : ''}`}>
+              <Outlet context={{ showToast }} />
+            </div>
+          </main>
+        </div>
 
-        {/* Bottom Navigation - Mobile Only */}
+        {/* ✅ Bottom Navigation - ONLY on mobile */}
         {showBottomNav && (
-          <BottomNav
-            role={user?.role as Role}
-            active={location.pathname}
-            onNavigate={(path: string) => navigate(path)}
-            onLogout={handleLogout}
-          />
+          <div className="flex-shrink-0 w-full">
+            <BottomNav
+              role={user?.role as Role}
+              active={location.pathname}
+              onNavigate={(path: string) => navigate(path)}
+              onLogout={handleLogout}
+            />
+          </div>
         )}
       </div>
     </div>

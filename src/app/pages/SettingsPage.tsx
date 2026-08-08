@@ -16,7 +16,6 @@ import {
   Briefcase,
   UserCircle,
   UploadCloud,
-  Settings
 } from 'lucide-react';
 import { useProfile, useUpdateProfile, useChangePassword, useUploadAvatar, useRemoveAvatar } from '@/hooks/useProfile';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -24,7 +23,7 @@ import { useToast } from '@/hooks/useToast';
 import { Role } from '@/types/api.types';
 import { useAuth } from '@/providers/AuthProvider';
 import { validateAvatarFile } from '@/lib/api/profile';
-import { Breadcrumb } from '../components/ui/breadcrumb';
+import { Breadcrumb } from '../components/ui/Breadcrumb';
 
 // Profile form schema
 const profileSchema = z.object({
@@ -53,7 +52,7 @@ export function SettingsPage() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const { user } = useAuth();
-const showToast = useToast();
+  const showToast = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const { data: profile, isLoading, error, refetch } = useProfile();
@@ -66,6 +65,8 @@ const showToast = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadedAvatarUrl, setUploadedAvatarUrl] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   // Profile form
   const {
@@ -99,7 +100,7 @@ const showToast = useToast();
     },
   });
 
-  // Load profile data when it changes
+  // Populate form when profile loads
   useEffect(() => {
     if (profile) {
       resetProfile({
@@ -112,11 +113,76 @@ const showToast = useToast();
     }
   }, [profile, resetProfile]);
 
+  // === Handle File Selection (Preview only) ===
+  const handleFileSelect = (e: ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      const file = files[0];
+      try {
+        validateAvatarFile(file);
+        setSelectedFile(file);
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setAvatarPreview(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+      } catch (error: any) {
+        showToast.error(error.message);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+      }
+    }
+  };
+
+  // === Upload Avatar (Step 1) – stores URL in state ===
+  const handleUploadAvatar = async () => {
+    if (!selectedFile) {
+      showToast.error('Please select a file first');
+      return;
+    }
+    if (!user?.id) {
+      showToast.error('User ID not found');
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      // Upload file → get URL
+      const result = await uploadAvatar.mutateAsync({
+        file: selectedFile,
+        userId: user.id,
+      });
+      
+      // ✅ Store the URL in state (but do NOT save to profile yet)
+      setUploadedAvatarUrl(result.url);
+      
+      // Clear file input and preview
+      setSelectedFile(null);
+      setAvatarPreview(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+
+      showToast.success('Avatar uploaded! Save your profile to apply changes.');
+    } catch (error: any) {
+      showToast.error(error.message || 'Failed to upload avatar');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // === Handle Profile Submit (Step 2) – includes avatar URL ===
   const handleProfileSubmit = async (data: ProfileFormValues) => {
     const updateData: any = {
       name: data.name,
       email: data.email,
     };
+
+    // ✅ Include avatar URL if we have one
+    if (uploadedAvatarUrl) {
+      updateData.avatar = uploadedAvatarUrl;
+    }
 
     if (profile?.role === 'orthophoniste') {
       updateData.specialization = data.specialization || null;
@@ -127,96 +193,26 @@ const showToast = useToast();
 
     await updateProfile.mutateAsync(updateData);
     setIsEditing(false);
+    setUploadedAvatarUrl(null); // Clear after save
+    showToast.success(t('settings.profile.updateSuccess', 'Profile updated successfully'));
   };
 
+  // === Remove Avatar ===
+  const handleRemoveAvatar = async () => {
+    if (window.confirm(t('settings.avatar.remove.confirm', 'Are you sure you want to remove your avatar?'))) {
+      await removeAvatar.mutateAsync();
+      refetch();
+    }
+  };
+
+  // === Password Submit ===
   const handlePasswordSubmit = async (data: PasswordFormValues) => {
     await changePassword.mutateAsync({
       currentPassword: data.currentPassword,
       newPassword: data.newPassword,
     });
     resetPassword();
-  };
-const handleFileSelect = (e: ChangeEvent<HTMLInputElement>) => {
-  const files = e.target.files;
-  console.log('📁 File input changed, files:', files);
-  
-  if (files && files.length > 0) {
-    const file = files[0];
-    console.log('📁 File details:', {
-      name: file.name,
-      type: file.type,
-      size: file.size,
-      lastModified: file.lastModified,
-      isFile: file instanceof File,
-      constructor: file.constructor.name,
-      toString: file.toString()
-    });
-    
-    try {
-      // Validate the file
-      validateAvatarFile(file);
-      
-      // If valid, proceed with preview
-      setSelectedFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setAvatarPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    } catch (error: any) {
-      showToast.error(error.message);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    }
-  } else {
-    console.warn('No file selected');
-  }
-};
-
-// Update the upload handler with more logging
-const handleUploadAvatar = async () => {
-  if (!selectedFile) {
-    showToast.error('Please select a file first');
-    return;
-  }
-  
-  if (!user?.id) {
-    showToast.error('User ID not found');
-    return;
-  }
-  
-  console.log('🚀 Starting upload process with file:', {
-    name: selectedFile.name,
-    type: selectedFile.type,
-    size: selectedFile.size,
-    userId: user.id
-  });
-  
-  try {
-    // The hook handles both steps
-    await uploadAvatar.mutateAsync({
-      file: selectedFile,
-      userId: user.id,
-    });
-    
-    // Clear the file input and preview
-    setSelectedFile(null);
-    setAvatarPreview(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-    
-    // Force refetch the profile to update the UI
-    refetch();
-  } catch (error) {
-    console.error('Avatar upload failed:', error);
-  }
-};
-  const handleRemoveAvatar = async () => {
-    if (window.confirm(t('settings.avatar.remove.confirm', 'Are you sure you want to remove your avatar?'))) {
-      await removeAvatar.mutateAsync();
-    }
+    showToast.success(t('settings.password.success', 'Password changed successfully'));
   };
 
   const getRoleLabel = (role: Role) => {
@@ -224,14 +220,6 @@ const handleUploadAvatar = async () => {
       case 'orthophoniste': return t('auth.login.role.orthophoniste', {});
       case 'parent': return t('auth.login.role.parent', {});
       default: return role;
-    }
-  };
-
-  const getRoleIcon = (role: Role) => {
-    switch(role) {
-      case 'orthophoniste': return <Briefcase className="w-5 h-5" />;
-      case 'parent': return <UserCircle className="w-5 h-5" />;
-      default: return <User className="w-5 h-5" />;
     }
   };
 
@@ -262,11 +250,11 @@ const handleUploadAvatar = async () => {
     );
   }
 
-const currentAvatar = avatarPreview || profile?.avatar || user?.avatar || null;
+  const currentAvatar = avatarPreview || uploadedAvatarUrl || profile?.avatar || user?.avatar || null;
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
-        <Breadcrumb showBack={true} showHome={true} />
+      <Breadcrumb showBack={true} showHome={true} />
 
       {/* Header */}
       <div>
@@ -284,22 +272,17 @@ const currentAvatar = avatarPreview || profile?.avatar || user?.avatar || null;
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
             <div className="p-4 border-b border-gray-200">
               <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-sm flex-shrink-0">
-  {user?.avatar ? (
-    <img 
-      src={user.avatar} 
-      alt={user.name}
-      className="w-full h-full rounded-full object-cover"
-    />
-  ) : (
-    user?.name?.charAt(0)?.toUpperCase() || 'U'
-  )}
-</div>
-
-<div className="relative">
-
- 
-</div>
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-sm flex-shrink-0">
+                  {currentAvatar ? (
+                    <img 
+                      src={currentAvatar} 
+                      alt={profile.name}
+                      className="w-full h-full rounded-full object-cover"
+                    />
+                  ) : (
+                    profile.name?.charAt(0)?.toUpperCase() || 'U'
+                  )}
+                </div>
                 <div className="min-w-0">
                   <p className="text-sm font-semibold truncate">{profile.name}</p>
                   <p className="text-xs text-muted-foreground truncate">{profile.email}</p>
@@ -365,7 +348,6 @@ const currentAvatar = avatarPreview || profile?.avatar || user?.avatar || null;
                         <button
                           onClick={() => {
                             setIsEditing(false);
-                            // Reset to original values
                             if (profile) {
                               resetProfile({
                                 name: profile.name || '',
@@ -402,45 +384,35 @@ const currentAvatar = avatarPreview || profile?.avatar || user?.avatar || null;
                 {/* Avatar Section */}
                 <div className="mb-6 p-4 bg-gray-50 rounded-lg">
                   <div className="flex items-center gap-6">
-                <div className="relative">
-  <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center text-primary text-2xl font-semibold overflow-hidden">
-    {currentAvatar ? (
-      <img 
-        src={currentAvatar} 
-        alt={profile.name}
-        className="w-full h-full object-cover"
-        onError={(e) => {
-          // Fallback if image fails to load
-          (e.target as HTMLImageElement).style.display = 'none';
-          const parent = (e.target as HTMLImageElement).parentElement;
-          if (parent) {
-            parent.innerHTML = profile.name?.charAt(0)?.toUpperCase() || 'U';
-          }
-        }}
-      />
-    ) : (
-      profile.name?.charAt(0)?.toUpperCase() || 'U'
-    )}
-  </div>
-  {isEditing && (
-    <div className="absolute -bottom-2 -right-2">
-      <input
-        type="file"
-        ref={fileInputRef}
-        onChange={handleFileSelect}
-        accept="image/*"
-        className="hidden"
-      />
-      <button
-        onClick={() => fileInputRef.current?.click()}
-        className="p-1.5 bg-white rounded-full border border-gray-200 shadow-sm hover:bg-gray-50 transition-colors"
-        title={t('settings.avatar.upload', 'Upload avatar')}
-      >
-        <Camera size={16} className="text-gray-600" />
-      </button>
-    </div>
-  )}
-</div>
+                    <div className="relative">
+                      <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center text-primary text-2xl font-semibold overflow-hidden">
+                        {currentAvatar ? (
+                          <img 
+                            src={currentAvatar} 
+                            alt={profile.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          profile.name?.charAt(0)?.toUpperCase() || 'U'
+                        )}
+                      </div>
+                      <div className="absolute -bottom-2 -right-2">
+                        <input
+                          type="file"
+                          ref={fileInputRef}
+                          onChange={handleFileSelect}
+                          accept="image/*"
+                          className="hidden"
+                        />
+                        <button
+                          onClick={() => fileInputRef.current?.click()}
+                          className="p-1.5 bg-white rounded-full border border-gray-200 shadow-sm hover:bg-gray-50 transition-colors"
+                          title={t('settings.avatar.upload', 'Upload avatar')}
+                        >
+                          <Camera size={16} className="text-gray-600" />
+                        </button>
+                      </div>
+                    </div>
                     <div>
                       <p className="text-sm font-medium">{profile.name}</p>
                       <p className="text-xs text-muted-foreground">{profile.email}</p>
@@ -451,52 +423,52 @@ const currentAvatar = avatarPreview || profile?.avatar || user?.avatar || null;
                       </div>
                     </div>
                   </div>
-                  
-                  {/* Avatar Actions */}
-                  {isEditing && selectedFile && (
-                    <div className="mt-4 flex items-center gap-3">
-                      <button
-                        onClick={handleUploadAvatar}
-                        disabled={uploadAvatar.isPending}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-white text-sm rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
-                      >
-                        {uploadAvatar.isPending ? (
-                          <>
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            {t('common.loading', {})}
-                          </>
-                        ) : (
-                          <>
-                            <UploadCloud size={16} />
-                            {t('settings.avatar.upload', 'Upload')}
-                          </>
-                        )}
-                      </button>
-                      <button
-                        onClick={() => {
-                          setSelectedFile(null);
-                          setAvatarPreview(null);
-                          if (fileInputRef.current) {
-                            fileInputRef.current.value = '';
-                          }
-                        }}
-                        className="px-3 py-1.5 border border-gray-200 text-sm rounded-lg hover:bg-gray-50 transition-colors"
-                      >
-                        {t('common.cancel', {})}
-                      </button>
-                    </div>
-                  )}
 
-                  {!isEditing && profile.avatar && (
-                    <div className="mt-4">
-                      <button
-                        onClick={handleRemoveAvatar}
-                        disabled={removeAvatar.isPending}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-red-600 text-sm hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
-                      >
-                        <Trash2 size={16} />
-                        {t('settings.avatar.remove', 'Remove avatar')}
-                      </button>
+                  {/* Avatar Actions - Only visible when editing */}
+                  {isEditing && (
+                    <div className="mt-4 flex flex-wrap items-center gap-3">
+                      {selectedFile ? (
+                        <>
+                          <button
+                            onClick={handleUploadAvatar}
+                            disabled={isUploading || uploadAvatar.isPending}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-white text-sm rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
+                          >
+                            {isUploading || uploadAvatar.isPending ? (
+                              <>
+                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                {t('common.loading', {})}
+                              </>
+                            ) : (
+                              <>
+                                <UploadCloud size={16} />
+                                {t('settings.avatar.upload', 'Upload')}
+                              </>
+                            )}
+                          </button>
+                          <button
+                            onClick={() => {
+                              setSelectedFile(null);
+                              setAvatarPreview(null);
+                              if (fileInputRef.current) {
+                                fileInputRef.current.value = '';
+                              }
+                            }}
+                            className="px-3 py-1.5 border border-gray-200 text-sm rounded-lg hover:bg-gray-50 transition-colors"
+                          >
+                            {t('common.cancel', {})}
+                          </button>
+                        </>
+                      ) : profile.avatar ? (
+                        <button
+                          onClick={handleRemoveAvatar}
+                          disabled={removeAvatar.isPending}
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-red-600 text-sm hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                        >
+                          <Trash2 size={16} />
+                          {t('settings.avatar.remove', 'Remove avatar')}
+                        </button>
+                      ) : null}
                     </div>
                   )}
                 </div>
