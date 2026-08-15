@@ -1,13 +1,16 @@
 // src/app/components/appointments/AppointmentEditModal.tsx
-import { useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { FormModal } from '@/app/components/ui/FormModal';
 import { useUpdateAppointment } from '@/hooks/useAppointments';
+import { useMyPatients } from '@/hooks/usePatients';
 import { useTranslation } from '@/hooks/useTranslation';
-import { AlertCircle } from 'lucide-react';
-import { Appointment, AppointmentType, AppointmentStatus } from '@/types/appointment.types';
+import { useAuth } from '@/providers/AuthProvider';
+import { AlertCircle, User, Calendar, Clock, MapPin, Video } from 'lucide-react';
+import { BaseModal } from '@/app/components/ui/BaseModal';
+import { LoadingSpinner } from '@/app/components/ui/LoadingSpinner';
+import { Appointment } from '@/types/appointment.types';
 
 interface AppointmentEditModalProps {
   isOpen: boolean;
@@ -16,89 +19,87 @@ interface AppointmentEditModalProps {
   onSuccess?: () => void;
 }
 
+// ✅ Schema includes patientId for form display, but we'll exclude it from the payload
 const editAppointmentSchema = z.object({
-  dateTime: z.string().min(1, 'Date and time are required'),
+  patientId: z.string().min(1, 'Patient is required'),
+  dateTime: z.string().min(1, 'Date and time is required'),
   duration: z.number().min(15, 'Duration must be at least 15 minutes'),
-  type: z.enum([
-    'initial-assessment',
-    'follow-up',
-    'therapy-session',
-    'progress-review',
-    'other',
-  ]),
-  status: z.enum([
-    'scheduled',
-    'in-progress',
-    'completed',
-    'cancelled',
-    'no-show',
-  ]),
-  notes: z.string().optional(),
+  type: z.enum(['initial-assessment', 'follow-up', 'therapy-session', 'progress-review', 'other']),
+  status: z.enum(['scheduled', 'in-progress', 'completed', 'cancelled', 'no-show']),
   location: z.string().optional(),
+  meetingLink: z.string().url('Please enter a valid URL').optional().or(z.literal('')),
   isVirtual: z.boolean().default(false),
-  meetingLink: z.string().optional(),
+  notes: z.string().optional(),
   cancellationReason: z.string().optional(),
 });
 
 type EditAppointmentFormValues = z.infer<typeof editAppointmentSchema>;
 
-export function AppointmentEditModal({ isOpen, onClose, appointment, onSuccess }: AppointmentEditModalProps) {
+export function AppointmentEditModal({ 
+  isOpen, 
+  onClose, 
+  appointment,
+  onSuccess 
+}: AppointmentEditModalProps) {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const updateAppointment = useUpdateAppointment(appointment.id);
+  const isAdmin = user?.role === 'orthophoniste';
+  
+  // Fetch patients for admin
+  const { data: patientsData, isLoading: patientsLoading } = useMyPatients({ limit: 100 });
+  const patients = patientsData?.data?.items || [];
 
   const {
     register,
     handleSubmit,
-    formState: { errors, isValid, isDirty },
+    formState: { errors, isSubmitting },
     reset,
     watch,
+    setValue,
   } = useForm<EditAppointmentFormValues>({
     resolver: zodResolver(editAppointmentSchema),
-    mode: 'onChange',
     defaultValues: {
-      dateTime: '',
-      duration: 30,
-      type: 'therapy-session',
-      status: 'scheduled',
-      notes: '',
-      location: '',
-      isVirtual: false,
-      meetingLink: '',
-      cancellationReason: '',
+      patientId: appointment.patientId,
+      dateTime: appointment.dateTime,
+      duration: appointment.duration,
+      type: appointment.type,
+      status: appointment.status,
+      location: appointment.location || '',
+      meetingLink: appointment.meetingLink || '',
+      isVirtual: appointment.isVirtual || false,
+      notes: appointment.notes || '',
+      cancellationReason: appointment.cancellationReason || '',
     },
   });
 
   const isVirtual = watch('isVirtual');
+  const currentStatus = watch('status');
+  const isCancelled = currentStatus === 'cancelled';
 
+  // Reset form when appointment changes
   useEffect(() => {
     if (appointment) {
       reset({
-        dateTime: appointment.dateTime.slice(0, 16),
+        patientId: appointment.patientId,
+        dateTime: appointment.dateTime,
         duration: appointment.duration,
         type: appointment.type,
         status: appointment.status,
-        notes: appointment.notes || '',
         location: appointment.location || '',
-        isVirtual: appointment.isVirtual || false,
         meetingLink: appointment.meetingLink || '',
+        isVirtual: appointment.isVirtual || false,
+        notes: appointment.notes || '',
         cancellationReason: appointment.cancellationReason || '',
       });
     }
   }, [appointment, reset]);
 
   const onSubmit = async (data: EditAppointmentFormValues) => {
-    await updateAppointment.mutateAsync({
-      dateTime: data.dateTime,
-      duration: data.duration,
-      type: data.type,
-      status: data.status,
-      notes: data.notes || undefined,
-      location: data.location || undefined,
-      isVirtual: data.isVirtual,
-      meetingLink: data.meetingLink || undefined,
-      cancellationReason: data.cancellationReason || undefined,
-    });
-
+    // ✅ Exclude patientId from the payload - only send updatable fields
+    const { patientId, ...updateData } = data;
+    
+    await updateAppointment.mutateAsync(updateData);
     onSuccess?.();
     onClose();
   };
@@ -109,29 +110,66 @@ export function AppointmentEditModal({ isOpen, onClose, appointment, onSuccess }
   };
 
   return (
-    <FormModal
+    <BaseModal
       isOpen={isOpen}
       onClose={handleClose}
-      onSubmit={handleSubmit(onSubmit)}
       title={t('appointments.editTitle', 'Edit Appointment')}
-      submitText={t('appointments.editSubmit', 'Update Appointment')}
-      isLoading={updateAppointment.isPending}
-      isSubmitDisabled={!isValid || !isDirty || updateAppointment.isPending}
-      size="md"
+      size="lg"
     >
-      <div className="space-y-4">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-2">
+        {/* Patient Selection - Admin only */}
+        {isAdmin && (
+          <div>
+            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+              {t('appointments.patient', 'Patient')} <span className="text-red-500">*</span>
+            </label>
+            {patientsLoading ? (
+              <div className="flex items-center justify-center py-2">
+                <LoadingSpinner size="sm" />
+              </div>
+            ) : (
+              <div className="relative">
+                <User size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <select
+                  {...register('patientId')}
+                  className={`w-full bg-muted rounded-xl pl-10 pr-4 py-3 text-sm outline-none transition-all ${
+                    errors.patientId ? 'border-2 border-red-400 focus:ring-red-400/30' : 'focus:ring-2 focus:ring-primary/30'
+                  }`}
+                  disabled={updateAppointment.isPending}
+                >
+                  <option value="">{t('patients.select', 'Select a patient...')}</option>
+                  {patients.map((patient) => (
+                    <option key={patient.id} value={patient.id}>
+                      {patient.fullName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {errors.patientId && (
+              <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                <AlertCircle size={14} /> {errors.patientId.message}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Date & Time */}
         <div>
           <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
             {t('appointments.dateTime', 'Date & Time')} <span className="text-red-500">*</span>
           </label>
-          <input
-            type="datetime-local"
-            {...register('dateTime')}
-            className={`w-full bg-muted rounded-xl px-4 py-3 text-sm outline-none transition-all ${
-              errors.dateTime ? 'border-2 border-red-400 focus:ring-red-400/30' : 'focus:ring-2 focus:ring-primary/30'
-            }`}
-            disabled={updateAppointment.isPending}
-          />
+          <div className="relative">
+            <Calendar size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="datetime-local"
+              {...register('dateTime')}
+              className={`w-full bg-muted rounded-xl pl-10 pr-4 py-3 text-sm outline-none transition-all ${
+                errors.dateTime ? 'border-2 border-red-400 focus:ring-red-400/30' : 'focus:ring-2 focus:ring-primary/30'
+              }`}
+              disabled={updateAppointment.isPending}
+            />
+          </div>
           {errors.dateTime && (
             <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
               <AlertCircle size={14} /> {errors.dateTime.message}
@@ -139,20 +177,24 @@ export function AppointmentEditModal({ isOpen, onClose, appointment, onSuccess }
           )}
         </div>
 
+        {/* Duration */}
         <div>
           <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
             {t('appointments.duration', 'Duration (minutes)')} <span className="text-red-500">*</span>
           </label>
-          <input
-            type="number"
-            {...register('duration', { valueAsNumber: true })}
-            placeholder="30"
-            min="15"
-            className={`w-full bg-muted rounded-xl px-4 py-3 text-sm outline-none transition-all ${
-              errors.duration ? 'border-2 border-red-400 focus:ring-red-400/30' : 'focus:ring-2 focus:ring-primary/30'
-            }`}
-            disabled={updateAppointment.isPending}
-          />
+          <div className="relative">
+            <Clock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="number"
+              {...register('duration', { valueAsNumber: true })}
+              min={15}
+              step={5}
+              className={`w-full bg-muted rounded-xl pl-10 pr-4 py-3 text-sm outline-none transition-all ${
+                errors.duration ? 'border-2 border-red-400 focus:ring-red-400/30' : 'focus:ring-2 focus:ring-primary/30'
+              }`}
+              disabled={updateAppointment.isPending}
+            />
+          </div>
           {errors.duration && (
             <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
               <AlertCircle size={14} /> {errors.duration.message}
@@ -160,6 +202,7 @@ export function AppointmentEditModal({ isOpen, onClose, appointment, onSuccess }
           )}
         </div>
 
+        {/* Type */}
         <div>
           <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
             {t('appointments.type', 'Type')} <span className="text-red-500">*</span>
@@ -184,6 +227,7 @@ export function AppointmentEditModal({ isOpen, onClose, appointment, onSuccess }
           )}
         </div>
 
+        {/* Status */}
         <div>
           <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
             {t('appointments.status', 'Status')} <span className="text-red-500">*</span>
@@ -208,59 +252,135 @@ export function AppointmentEditModal({ isOpen, onClose, appointment, onSuccess }
           )}
         </div>
 
-        <div>
-          <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
-            {t('appointments.location', 'Location')}
-          </label>
-          <input
-            type="text"
-            {...register('location')}
-            placeholder="Clinic Room 101"
-            className="w-full bg-muted rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30 transition-all"
-            disabled={updateAppointment.isPending}
-          />
-        </div>
-
-        <div className="flex items-center gap-3">
-          <label className="flex items-center gap-2 text-sm text-gray-700">
-            <input
-              type="checkbox"
-              {...register('isVirtual')}
-              className="w-4 h-4 text-primary rounded focus:ring-primary"
-              disabled={updateAppointment.isPending}
-            />
-            {t('appointments.virtual', 'Virtual Meeting')}
-          </label>
-        </div>
-
-        {isVirtual && (
+        {/* Cancellation Reason - shown when status is cancelled */}
+        {isCancelled && (
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
-              {t('appointments.meetingLink', 'Meeting Link')}
+              {t('appointments.cancellationReason', 'Cancellation Reason')}
             </label>
-            <input
-              type="url"
-              {...register('meetingLink')}
-              placeholder="https://meet.google.com/..."
-              className="w-full bg-muted rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+            <textarea
+              {...register('cancellationReason')}
+              rows={2}
+              placeholder={t('appointments.cancellationReasonPlaceholder', 'Why was this appointment cancelled?')}
+              className="w-full bg-muted rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30 transition-all resize-none"
               disabled={updateAppointment.isPending}
             />
           </div>
         )}
 
+        {/* Virtual / In-person - Fixed Radio Buttons */}
+        <div>
+          <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+            {t('appointments.locationType', 'Location Type')}
+          </label>
+          <div className="flex items-center gap-4">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                checked={!isVirtual}
+                onChange={() => setValue('isVirtual', false)}
+                className="w-4 h-4 text-primary"
+                disabled={updateAppointment.isPending}
+              />
+              <span className="text-sm">{t('appointments.inPerson', 'In Person')}</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                checked={isVirtual}
+                onChange={() => setValue('isVirtual', true)}
+                className="w-4 h-4 text-primary"
+                disabled={updateAppointment.isPending}
+              />
+              <span className="text-sm">{t('appointments.virtual', 'Virtual')}</span>
+            </label>
+          </div>
+        </div>
+
+        {/* Location (in-person) */}
+        {!isVirtual && (
+          <div>
+            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+              {t('appointments.location', 'Location')}
+            </label>
+            <div className="relative">
+              <MapPin size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="text"
+                {...register('location')}
+                placeholder="Clinic Room 101"
+                className="w-full bg-muted rounded-xl pl-10 pr-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+                disabled={updateAppointment.isPending}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Meeting Link (virtual) */}
+        {isVirtual && (
+          <div>
+            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+              {t('appointments.meetingLink', 'Meeting Link')}
+            </label>
+            <div className="relative">
+              <Video size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="url"
+                {...register('meetingLink')}
+                placeholder="https://meet.google.com/abc-defg-hij"
+                className={`w-full bg-muted rounded-xl pl-10 pr-4 py-3 text-sm outline-none transition-all ${
+                  errors.meetingLink ? 'border-2 border-red-400 focus:ring-red-400/30' : 'focus:ring-2 focus:ring-primary/30'
+                }`}
+                disabled={updateAppointment.isPending}
+              />
+            </div>
+            {errors.meetingLink && (
+              <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
+                <AlertCircle size={14} /> {errors.meetingLink.message}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Notes */}
         <div>
           <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
             {t('appointments.notes', 'Notes')}
           </label>
           <textarea
             {...register('notes')}
-            rows={2}
-            placeholder="Any special instructions..."
-            className="w-full bg-muted rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30 resize-none"
+            rows={3}
+            placeholder={t('appointments.notesPlaceholder', 'Add any additional notes...')}
+            className="w-full bg-muted rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30 transition-all resize-none"
             disabled={updateAppointment.isPending}
           />
         </div>
-      </div>
-    </FormModal>
+
+        {/* Actions */}
+        <div className="flex gap-3 pt-4 border-t border-gray-200">
+          <button
+            type="submit"
+            disabled={isSubmitting || updateAppointment.isPending}
+            className="flex-1 py-2.5 rounded-xl bg-primary text-white text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-50"
+          >
+            {isSubmitting || updateAppointment.isPending ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin inline mr-2" />
+                {t('common.loading')}
+              </>
+            ) : (
+              t('common.save', 'Save Changes')
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={handleClose}
+            className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm hover:bg-gray-50 transition-colors"
+          >
+            {t('common.cancel')}
+          </button>
+        </div>
+      </form>
+    </BaseModal>
   );
 }

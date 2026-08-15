@@ -78,20 +78,12 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
       <div className="w-full max-w-md lg:max-w-lg">
         {/* Logo */}
         <div className="flex flex-col items-center mb-8 md:mb-10">
-          <div
-            className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-white flex items-center justify-center shadow-lg mb-4 relative"
-            style={{ boxShadow: '0 8px 32px rgba(74,144,217,0.3)' }}
-          >
-            <span
-              className="text-3xl md:text-4xl font-bold"
-              style={{ color: '#4A90D9', fontFamily: 'Poppins, sans-serif' }}
-            >
-              O
-            </span>
-            <div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-[#F5A623] flex items-center justify-center text-white text-sm">
-              💬
-            </div>
-          </div>
+          <img
+            src="/ortho-voix.png"
+            alt="OrthoVoix Logo"
+            className="w-20 h-20 md:w-24 md:h-24 object-contain mb-4 drop-shadow-lg"
+            style={{ filter: 'drop-shadow(0 8px 32px rgba(74,144,217,0.3))' }}
+          />
           <h1
             className="text-white text-2xl md:text-3xl font-bold"
             style={{

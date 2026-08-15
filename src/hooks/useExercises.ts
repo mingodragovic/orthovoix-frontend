@@ -8,14 +8,12 @@ import {
   getExerciseCategories,
   searchExercises,
   getExerciseById,
-  createExercise,
   createExerciseWithMedia,
   updateExercise,
   deleteExercise,
 } from '@/lib/api/exercises';
 import type {
   ExerciseFilters,
-  CreateExerciseRequest,
   CreateExerciseWithMediaRequest,
   UpdateExerciseRequest,
 } from '@/types/exercise.types';
@@ -31,13 +29,16 @@ export const exerciseKeys = {
   detail: (id: string) => [...exerciseKeys.details(), id] as const,
 };
 
+// ✅ Define the constant here
+const EXERCISES_BASE = '/exercises';
+
 // === QUERIES ===
 
 export function useExercises(filters?: ExerciseFilters) {
   return useQuery({
     queryKey: exerciseKeys.list(filters),
     queryFn: () => getExercises(filters),
-    staleTime: 0, // Always refetch
+    staleTime: 0,
     refetchOnMount: true,
     refetchOnWindowFocus: true,
   });
@@ -47,7 +48,7 @@ export function useExerciseCategories() {
   return useQuery({
     queryKey: exerciseKeys.categories(),
     queryFn: getExerciseCategories,
-    staleTime: 24 * 60 * 60 * 1000, // 24 hours - categories don't change often
+    staleTime: 24 * 60 * 60 * 1000,
   });
 }
 
@@ -69,59 +70,39 @@ export function useExercise(id: string) {
 
 // === MUTATIONS ===
 
-export function useCreateExercise() {
-  const queryClient = useQueryClient();
-  const { success, error } = useToast();
-  const { t } = useTranslation();
-
-  return useMutation({
-    mutationFn: (data: CreateExerciseRequest) => createExercise(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: exerciseKeys.lists() });
-      success(t('exercises.create.success', '✅ Exercise created successfully!'));
-    },
-    onError: (err: any) => {
-      const message = err.response?.data?.message || t('exercises.create.error', '❌ Failed to create exercise');
-      error(message);
-    },
-  });
-}
-
 export function useCreateExerciseWithMedia() {
   const queryClient = useQueryClient();
-  const { success, error } = useToast(); // ✅ FIX: Don't destructure loading
+  const { success, error } = useToast();
   const { t } = useTranslation();
   const toastIdRef = useRef<string | number | undefined>(undefined);
 
   return useMutation({
-    mutationFn: (data: CreateExerciseWithMediaRequest) => createExerciseWithMedia(data),
+    mutationFn: async (data: CreateExerciseWithMediaRequest) => {
+      // The createExerciseWithMedia function from the API layer already handles
+      // building the FormData correctly. We just need to pass the data.
+      const response = await createExerciseWithMedia(data);
+      return response;
+    },
     onMutate: () => {
-      // ✅ FIX: Use toast directly from sonner and store the ID
       toastIdRef.current = toast.loading(t('exercises.create.loading', 'Creating exercise...'));
       return toastIdRef.current;
     },
     onSuccess: () => {
-      // ✅ FIX: Dismiss loading toast first
       if (toastIdRef.current !== undefined) {
         toast.dismiss(toastIdRef.current);
         toastIdRef.current = undefined;
       }
-      
-      // Show success toast
       success(t('exercises.create.success', '✅ Exercise created successfully!'), {
         duration: 3000,
         position: 'top-center',
       });
-      
       queryClient.invalidateQueries({ queryKey: exerciseKeys.lists() });
     },
     onError: (err: any) => {
-      // ✅ FIX: Dismiss loading toast on error
       if (toastIdRef.current !== undefined) {
         toast.dismiss(toastIdRef.current);
         toastIdRef.current = undefined;
       }
-      
       const message = err.response?.data?.message || t('exercises.create.error', '❌ Failed to create exercise');
       error(message, {
         duration: 4000,

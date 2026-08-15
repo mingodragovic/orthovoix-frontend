@@ -24,7 +24,6 @@ export async function getExercises(filters?: ExerciseFilters): Promise<Exercises
   if (filters?.category) params.append('category', filters.category);
   if (filters?.difficulty) params.append('difficulty', filters.difficulty);
   if (filters?.search) params.append('search', filters.search);
-  // ✅ FIX: Only append isActive if it's explicitly provided
   if (filters?.isActive !== undefined) {
     params.append('isActive', String(filters.isActive));
   }
@@ -58,13 +57,8 @@ export async function getExerciseById(id: string): Promise<ExerciseResponse> {
   return response.data;
 }
 
-// Create exercise (JSON only)
-export async function createExercise(data: CreateExerciseRequest): Promise<Exercise> {
-  const response = await apiClient.post<Exercise>(EXERCISES_BASE, data);
-  return response.data;
-}
-
 // Create exercise with media (multipart/form-data)
+
 export async function createExerciseWithMedia(
   data: CreateExerciseWithMediaRequest
 ): Promise<ExerciseWithMediaResponse> {
@@ -81,11 +75,9 @@ export async function createExerciseWithMedia(
     formData.append('duration', String(data.duration));
   }
   
-  // ✅ FIX: Always send isActive, default to true if not provided
   const isActive = data.isActive !== undefined ? data.isActive : true;
   formData.append('isActive', String(isActive));
   
-  // Send materials and tags as JSON strings (the backend expects arrays)
   if (data.materials && data.materials.length > 0) {
     formData.append('materials', JSON.stringify(data.materials));
   }
@@ -94,45 +86,74 @@ export async function createExerciseWithMedia(
     formData.append('tags', JSON.stringify(data.tags));
   }
   
-  // Append files
+  // Collect all files
   const files: File[] = [];
-  let audioFileIndex = -1;
-  let imageFileIndex = -1;
-  let videoFileIndex = -1;
   
-  if (data.audioFile) {
-    files.push(data.audioFile);
-    audioFileIndex = files.length - 1;
+  // Track indices
+  let coverImageIndex = -1;
+  let videoIndex = -1;
+  const slidesData: { name: string; imageIndex: number; audioIndex: number; order: number }[] = [];
+
+  // 1. Add cover image first if exists
+  if (data.coverImageFile) {
+    coverImageIndex = files.length;
+    files.push(data.coverImageFile);
   }
-  
-  if (data.imageFile) {
-    files.push(data.imageFile);
-    imageFileIndex = files.length - 1;
+
+  // 2. Process slides - add images and audios
+  if (data.slides && data.slides.length > 0) {
+    for (let i = 0; i < data.slides.length; i++) {
+      const slide = data.slides[i];
+      let imageIndex = -1;
+      let audioIndex = -1;
+
+      // Add image file if exists
+      if (slide.imageFile) {
+        imageIndex = files.length;
+        files.push(slide.imageFile);
+      }
+
+      // Add audio file if exists
+      if (slide.audioFile) {
+        audioIndex = files.length;
+        files.push(slide.audioFile);
+      }
+
+      // ✅ Include the name in the slides data
+      slidesData.push({
+        name: slide.name?.trim() || `Slide ${i + 1}`,
+        imageIndex: imageIndex,
+        audioIndex: audioIndex,
+        order: i,
+      });
+    }
   }
-  
+
+  // 3. Add video last if exists
   if (data.videoFile) {
+    videoIndex = files.length;
     files.push(data.videoFile);
-    videoFileIndex = files.length - 1;
   }
-  
+
   // Append files array
   files.forEach((file) => {
     formData.append('files', file);
   });
-  
-  // Append file indices
-  if (audioFileIndex >= 0) {
-    formData.append('audioFileIndex', String(audioFileIndex));
+
+  // Append indices
+  if (coverImageIndex >= 0) {
+    formData.append('coverImageIndex', String(coverImageIndex));
   }
-  
-  if (imageFileIndex >= 0) {
-    formData.append('imageFileIndex', String(imageFileIndex));
+
+  if (videoIndex >= 0) {
+    formData.append('videoIndex', String(videoIndex));
   }
-  
-  if (videoFileIndex >= 0) {
-    formData.append('videoFileIndex', String(videoFileIndex));
+
+  // ✅ Append slides as JSON string with names
+  if (slidesData.length > 0) {
+    formData.append('slides', JSON.stringify(slidesData));
   }
-  
+
   const response = await apiClient.post<ExerciseWithMediaResponse>(
     `${EXERCISES_BASE}/with-media`,
     formData,
@@ -145,7 +166,7 @@ export async function createExerciseWithMedia(
   return response.data;
 }
 
-// Update exercise
+// Update exercise (supports media updates via keys)
 export async function updateExercise(id: string, data: UpdateExerciseRequest): Promise<Exercise> {
   const response = await apiClient.put<Exercise>(`${EXERCISES_BASE}/${id}`, data);
   return response.data;

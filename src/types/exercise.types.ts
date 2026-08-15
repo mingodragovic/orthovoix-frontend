@@ -13,6 +13,15 @@ export type ExerciseCategory =
 
 export type ExerciseDifficulty = 'beginner' | 'intermediate' | 'advanced';
 
+export interface ExerciseSlide {
+  name?: string;
+  imageUrl?: string;
+  imageKey?: string;
+  audioUrl?: string;
+  audioKey?: string;
+  order: number;
+}
+
 export interface Exercise {
   id: string;
   title: string;
@@ -28,6 +37,9 @@ export interface Exercise {
   audioKey?: string;
   videoKey?: string;
   imageKey?: string;
+  coverImageUrl?: string;
+  coverImageKey?: string;
+  slides?: ExerciseSlide[];
   tags?: string[];
   isActive: boolean;
   createdBy: string;
@@ -48,10 +60,26 @@ export interface CreateExerciseRequest {
   isActive?: boolean;
 }
 
-export interface CreateExerciseWithMediaRequest extends CreateExerciseRequest {
-  audioFile?: File | null;
-  imageFile?: File | null;
+export interface SlideInput {
+  name: string;
+  imageFile: File | null;
+  audioFile: File | null;
+  order: number;
+}
+
+export interface CreateExerciseWithMediaRequest {
+  title: string;
+  description: string;
+  category: ExerciseCategory;
+  difficulty: ExerciseDifficulty;
+  instructions: string;
+  materials?: string[];
+  duration?: number;
+  tags?: string[];
+  isActive?: boolean;
+  coverImageFile?: File | null;
   videoFile?: File | null;
+  slides?: SlideInput[];
 }
 
 export interface UpdateExerciseRequest {
@@ -64,6 +92,16 @@ export interface UpdateExerciseRequest {
   duration?: number;
   tags?: string[];
   isActive?: boolean;
+  coverImageKey?: string | null;
+  videoKey?: string | null;
+  slides?: {
+    name?: string;
+    imageKey?: string;
+    audioKey?: string;
+    imageIndex?: number;
+    audioIndex?: number;
+    order: number;
+  }[];
 }
 
 export interface ExerciseFilters {
@@ -114,10 +152,13 @@ export interface ExerciseWithMediaResponse {
   path: string;
   data: {
     exercise: Exercise;
-    files: {
-      audio: 'Uploaded' | 'Not provided';
-      image: 'Uploaded' | 'Not provided';
+    fileInfo: {
+      totalFiles: number;
+      coverImage: 'Uploaded' | 'Not provided';
       video: 'Uploaded' | 'Not provided';
+      slidesCount: number;
+      imagesUploaded: number;
+      audioUploaded: number;
     };
   };
 }

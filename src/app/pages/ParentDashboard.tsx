@@ -31,21 +31,43 @@ import {
   PieChart,
   Pie,
   Cell,
-  BarChart,
-  Bar,
 } from 'recharts';
 import { useAuth } from '@/providers/AuthProvider';
+import { format } from 'date-fns';
+import { fr, enUS, arSA } from 'date-fns/locale';
 
 export function ParentDashboard() {
-    const { user } = useAuth();
+  const { user } = useAuth();
   const isParent = user?.role === 'parent';
   const navigate = useNavigate();
-  const { t } = useTranslation();
-   const { data: dashboard, isLoading, error } = useParentDashboard(isParent);
-;
+  const { t, language } = useTranslation();
   
-  
+  const { data: dashboard, isLoading, error } = useParentDashboard(isParent);
   const { data: unreadCount } = useUnreadCount();
+
+  const getLocale = () => {
+    switch(language) {
+      case 'ar': return arSA;
+      case 'en': return enUS;
+      default: return fr;
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    try {
+      return format(new Date(dateString), 'dd MMM yyyy', { locale: getLocale() });
+    } catch {
+      return dateString;
+    }
+  };
+
+  const formatDateTime = (dateString: string) => {
+    try {
+      return format(new Date(dateString), 'dd MMM yyyy, HH:mm', { locale: getLocale() });
+    } catch {
+      return dateString;
+    }
+  };
 
   if (isLoading) {
     return (
@@ -78,7 +100,7 @@ export function ParentDashboard() {
     { name: t('parent.dashboard.stats.completed'), value: stats.completedExercises, color: '#48BB78' },
     { name: t('parent.dashboard.stats.inProgress'), value: stats.inProgressExercises, color: '#4A90D9' },
     { name: t('parent.dashboard.stats.overdue'), value: stats.overdueExercises, color: '#FC8181' },
-  ];
+  ].filter(item => item.value > 0);
 
   const COLORS = ['#48BB78', '#4A90D9', '#FC8181'];
 
@@ -87,7 +109,7 @@ export function ParentDashboard() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">
+          <h1 className="text-2xl font-bold text-gray-900" style={{ fontFamily: 'Poppins, sans-serif' }}>
             {t('parent.dashboard.title', 'Dashboard')}
           </h1>
           <p className="text-sm text-gray-500">
@@ -97,11 +119,12 @@ export function ParentDashboard() {
         <button
           onClick={() => navigate('/parent/notifications')}
           className="relative p-2 rounded-full hover:bg-gray-100 transition-colors"
+          aria-label="Notifications"
         >
           <Bell size={20} className="text-gray-600" />
           {unreadCount !== undefined && unreadCount > 0 && (
-            <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 rounded-full text-[8px] text-white flex items-center justify-center font-bold">
-              {unreadCount > 9 ? '9+' : unreadCount}
+            <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-red-500 rounded-full text-[9px] text-white flex items-center justify-center font-bold px-1">
+              {unreadCount > 99 ? '99+' : unreadCount}
             </span>
           )}
         </button>
@@ -187,7 +210,7 @@ export function ParentDashboard() {
           <h3 className="text-sm font-medium text-gray-900 mb-4">
             {t('parent.dashboard.progressTrend', 'Progress Trend')}
           </h3>
-          {progressTrend.length > 0 ? (
+          {progressTrend && progressTrend.length > 0 ? (
             <div style={{ height: 200 }}>
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={progressTrend}>
@@ -197,6 +220,7 @@ export function ParentDashboard() {
                     tick={{ fontSize: 10 }}
                     tickLine={false}
                     axisLine={false}
+                    tickFormatter={(value) => formatDate(value)}
                   />
                   <YAxis
                     tick={{ fontSize: 10 }}
@@ -211,6 +235,7 @@ export function ParentDashboard() {
                       borderRadius: '8px',
                       fontSize: '12px',
                     }}
+                    labelFormatter={(value) => formatDate(value)}
                   />
                   <Legend wrapperStyle={{ fontSize: '10px' }} />
                   <Line
@@ -236,39 +261,45 @@ export function ParentDashboard() {
           <h3 className="text-sm font-medium text-gray-900 mb-4">
             {t('parent.dashboard.exerciseDistribution', 'Exercise Distribution')}
           </h3>
-          <div style={{ height: 200 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={pieData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={50}
-                  outerRadius={80}
-                  paddingAngle={5}
-                  dataKey="value"
-                >
-                  {pieData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'white',
-                    border: '1px solid #E5E7EB',
-                    borderRadius: '8px',
-                    fontSize: '12px',
-                  }}
-                />
-                <Legend wrapperStyle={{ fontSize: '10px' }} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
+          {pieData.length > 0 ? (
+            <div style={{ height: 200 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={pieData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={50}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {pieData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'white',
+                      border: '1px solid #E5E7EB',
+                      borderRadius: '8px',
+                      fontSize: '12px',
+                    }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: '10px' }} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <p className="text-gray-500 text-sm text-center py-8">
+              {t('parent.dashboard.noData', 'No data available')}
+            </p>
+          )}
         </div>
       </div>
 
       {/* Recent Exercises */}
-      {recentExercises.length > 0 && (
+      {recentExercises && recentExercises.length > 0 && (
         <div>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-medium text-gray-900">
@@ -297,7 +328,7 @@ export function ParentDashboard() {
       )}
 
       {/* Upcoming Appointments */}
-      {upcomingAppointments.length > 0 && (
+      {upcomingAppointments && upcomingAppointments.length > 0 && (
         <div>
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-medium text-gray-900">
@@ -322,6 +353,54 @@ export function ParentDashboard() {
                 status="scheduled"
                 orthophonisteName=""
               />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Recent Notifications */}
+      {recentNotifications && recentNotifications.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-medium text-gray-900">
+              {t('parent.dashboard.recentNotifications', 'Recent Notifications')}
+            </h2>
+            <button
+              onClick={() => navigate('/parent/notifications')}
+              className="text-xs text-primary hover:underline"
+            >
+              {t('common.viewAll')}
+            </button>
+          </div>
+          <div className="space-y-2">
+            {recentNotifications.slice(0, 3).map((notification) => (
+              <div
+                key={notification.id}
+                className={`bg-white rounded-xl p-4 shadow-sm border transition-all hover:shadow-md cursor-pointer ${
+                  !notification.read ? 'border-l-4 border-l-primary border-gray-100' : 'border-gray-100'
+                }`}
+                onClick={() => {
+                  if (notification.actionUrl) {
+                    navigate(notification.actionUrl);
+                  }
+                }}
+              >
+                <div className="flex items-start gap-3">
+                  <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
+                    !notification.read ? 'bg-primary' : 'bg-gray-300'
+                  }`} />
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-medium ${!notification.read ? 'text-gray-900' : 'text-gray-600'}`}>
+                      {notification.title}
+                    </p>
+                    <p className="text-sm text-gray-500 mt-0.5 line-clamp-2">{notification.message}</p>
+                    <p className="text-xs text-gray-400 mt-1">{formatDateTime(notification.createdAt)}</p>
+                  </div>
+                  {!notification.read && (
+                    <span className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />
+                  )}
+                </div>
+              </div>
             ))}
           </div>
         </div>

@@ -1,4 +1,45 @@
 // src/types/dashboard.types.ts
+export interface AdminDashboardResponse {
+  statusCode: number;
+  message: string;
+  timestamp: string;
+  path: string;
+  data: {
+    stats: {
+      totalPatients: number;
+      activePatients: number;
+      inactivePatients: number;
+      dischargedPatients: number;
+      totalExercises: number;
+      totalAssignments: number;
+      completedAssignments: number;
+      inProgressAssignments: number;
+      overdueAssignments: number;
+      upcomingAppointments: number;
+      averageCompletionRate: number;
+    };
+    recentActivity: Array<{
+      date: string;
+      patientName: string;
+      action: string;
+      description: string;
+      patientId: string;
+    }>;
+    patientGrowth: Array<{
+      month: string;
+      newPatients: number;
+      totalPatients: number;
+    }>;
+    categoryDistribution: Array<{
+      category: string;
+      count: number;
+      color: string;
+    }>;
+    weeklyCompletionRate: number;
+    patientSatisfaction: number;
+  };
+}
+
 export interface ParentDashboardResponse {
   statusCode: number;
   message: string;
@@ -38,7 +79,7 @@ export interface ParentDashboardResponse {
     upcomingAppointments: Array<{
       id: string;
       dateTime: string;
-      location: string;
+      location: string | null;
       isVirtual: boolean;
       type: string;
     }>;
@@ -48,7 +89,7 @@ export interface ParentDashboardResponse {
       message: string;
       createdAt: string;
       read: boolean;
-      actionUrl: string;
+      actionUrl: string | null;
     }>;
     unreadNotifications: number;
   };

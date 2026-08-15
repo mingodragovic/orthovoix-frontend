@@ -1,17 +1,25 @@
 // src/types/notification.types.ts
 export type NotificationType =
   | 'appointment'
+  | 'appointment-created'
+  | 'appointment-updated'
+  | 'appointment-cancelled'
   | 'appointment-reminder'
   | 'exercise'
   | 'exercise-assigned'
   | 'exercise-due-soon'
   | 'exercise-overdue'
+  | 'exercise-completed'
   | 'progress'
   | 'progress-updated'
+  | 'progress-milestone'
+  | 'patient'
+  | 'patient-created'
+  | 'patient-updated'
   | 'system'
   | 'reminder'
-  | 'patient'
-  | 'report';
+  | 'report'
+  | 'report-ready';
 
 export interface Notification {
   id: string;

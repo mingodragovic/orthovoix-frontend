@@ -50,6 +50,12 @@ import { ParentHome } from './components/parent/ParentHome';
 import { AdminAppointments } from './pages/AdminAppointments';
 import { AdminRecordings } from './pages/AdminRecordings';
 import { AdminAppointmentDetail } from './pages/AdminAppointmentDetail';
+import { ParentSubmissionDetail } from './pages/ParentSubmissionDetail';
+import { ParentSubmissions } from './pages/ParentSubmissions';
+import { AdminSubmissionDetail } from './pages/AdminSubmissionDetail';
+import { AdminSubmissions } from './pages/AdminSubmissions';
+import { AdminNotifications } from './pages/AdminNotifications';
+import { PWAUpdate } from './components/common/PWAUpdate';
 
 // Loading component
 function LoadingScreen() {
@@ -82,6 +88,7 @@ function AppContent() {
         }}
         dir={isRTL ? 'rtl' : 'ltr'}
       />
+      <PWAUpdate />
       <Routes>
         {/* Public Routes */}
         <Route path="/login" element={<LoginScreen />} />
@@ -205,6 +212,22 @@ function AppContent() {
               </ProtectedRoute>
             }
           />
+<Route
+  path="/admin/submissions"
+  element={
+    <ProtectedRoute allowedRoles={['orthophoniste']}>
+      <AdminSubmissions />
+    </ProtectedRoute>
+  }
+/>
+<Route
+  path="/admin/submissions/:id"
+  element={
+    <ProtectedRoute allowedRoles={['orthophoniste']}>
+      <AdminSubmissionDetail />
+    </ProtectedRoute>
+  }
+/>
 
           {/* Parent Routes */}
           <Route
@@ -239,6 +262,22 @@ function AppContent() {
               </ProtectedRoute>
             }
           />
+<Route
+  path="/parent/submissions"
+  element={
+    <ProtectedRoute allowedRoles={['parent']}>
+      <ParentSubmissions />
+    </ProtectedRoute>
+  }
+/>
+<Route
+  path="/parent/submissions/:id"
+  element={
+    <ProtectedRoute allowedRoles={['parent']}>
+      <ParentSubmissionDetail />
+    </ProtectedRoute>
+  }
+/>
           <Route
             path="/parent/progress"
             element={
@@ -302,6 +341,14 @@ function AppContent() {
   element={
     <ProtectedRoute allowedRoles={['orthophoniste']}>
       <AdminAppointmentDetail />
+    </ProtectedRoute>
+  }
+/>
+<Route
+  path="/notifications"
+  element={
+    <ProtectedRoute allowedRoles={['orthophoniste']}>
+      <AdminNotifications />
     </ProtectedRoute>
   }
 />

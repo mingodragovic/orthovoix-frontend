@@ -2,6 +2,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api/client';
 import type { ParentDashboardResponse } from '@/types/dashboard.types';
+import { useAuth } from '@/providers/AuthProvider';
 
 const DASHBOARD_BASE = '/dashboard';
 
@@ -16,12 +17,15 @@ export async function getParentDashboard(): Promise<ParentDashboardResponse['dat
   return response.data.data;
 }
 
-export function useParentDashboard(enabled: boolean = true) {
+export function useParentDashboard() {
+  const { user } = useAuth();
+  const isParent = user?.role === 'parent';
+  
   return useQuery({
     queryKey: dashboardKeys.parent,
     queryFn: getParentDashboard,
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
-    enabled, // ✅ Only fetch when enabled
+    enabled: isParent, // ✅ Now uses the boolean from useAuth
   });
 }
